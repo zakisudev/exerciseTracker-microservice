@@ -52,66 +52,69 @@ app.get('/api/users', async (req, res) => {
 
 // Add exercise
 app.post('/api/users/:_id/exercises', async (req, res) => {
-  const { _id } = req.params;
-  const { description, duration, date } = req.body;
-  const newExercise = { description, duration, date };
+  try {
+    const user = await User.findById(req.params._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-  if (!description) console.log('Not created');
-  if (!duration) console.log('Not created');
-  if (!date) console.log('Not created');
-  newExercise.date = new Date();
+    user.log.push({
+      description: req.body.description,
+      duration: req.body.duration,
+      date: req.body.date ? new Date(req.body.date) : new Date(),
+    });
 
-  const user = await User.findById(_id);
+    const updatedUser = await user.save();
 
-  if (!user) return console.error('Exercise not creates');
-
-  user.log.push(newExercise);
-
-  user.save();
-  res.json({
-    _id: user._id,
-    username: user.username,
-    date: new Date(newExercise.date).toDateString(),
-    duration: newExercise.duration,
-    description: newExercise.description,
-  });
+    res.json({
+      _id: updatedUser._id,
+      username: updatedUser.username,
+      date: new Date(
+        updatedUser.log[updatedUser.log.length - 1].date
+      ).toDateString(),
+      duration: updatedUser.log[updatedUser.log.length - 1].duration,
+      description: updatedUser.log[updatedUser.log.length - 1].description,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Get user's exercise log
 app.get('/api/users/:_id/logs', async (req, res) => {
-  const { _id } = req.params;
-  const user = await User.findById(_id);
-  if (!user) return console.error('User not found');
-  const { log } = user;
-  const { limit, from, to } = req.query;
-  let filteredLog = log;
-  if (from) {
-    const fromDate = new Date(from);
-    filteredLog = filteredLog.filter((exercise) => {
-      return exercise.date >= fromDate;
+  try {
+    const user = await User.findById(req.params._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let logs = user.log;
+
+    // Filter by date range if 'from' and 'to' are provided
+    if (req.query.from || req.query.to) {
+      const fromDate = req.query.from ? new Date(req.query.from) : new Date(0);
+      const toDate = req.query.to ? new Date(req.query.to) : new Date();
+
+      logs = logs.filter((log) => {
+        const logDate = new Date(log.date);
+        return logDate >= fromDate && logDate <= toDate;
+      });
+    }
+
+    // Limit the number of logs if 'limit' is provided
+    if (req.query.limit) {
+      logs = logs.slice(0, req.query.limit);
+    }
+
+    res.json({
+      _id: user._id,
+      username: user.username,
+      count: logs.length,
+      log: logs,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  if (to) {
-    const toDate = new Date(to);
-    filteredLog = filteredLog.filter((exercise) => {
-      return exercise.date <= toDate;
-    });
-  }
-  if (limit) {
-    filteredLog = filteredLog.slice(0, limit);
-  }
-  res.json({
-    _id: user._id,
-    username: user.username,
-    count: filteredLog.length,
-    log: filteredLog.map((exercise) => {
-      return {
-        description: exercise.description,
-        duration: exercise.duration,
-        date: new Date(exercise.date).toDateString(),
-      };
-    }),
-  });
 });
 
 const listener = app.listen(process.env.PORT || 3000, () => {
