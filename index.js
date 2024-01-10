@@ -94,35 +94,27 @@ app.get('/api/users/:_id/logs', async (req, res) => {
       const fromDate = req.query.from ? new Date(req.query.from) : new Date(0);
       const toDate = req.query.to ? new Date(req.query.to) : new Date();
 
-      logs = logs
-        .filter((log) => {
-          const logDate = new Date(log.date);
-          return logDate >= fromDate && logDate <= toDate;
-        })
-        .map((log) => {
-          return {
-            description: log.description,
-            duration: log.duration,
-            date: log.date.toDateString(),
-          };
-        });
+      logs = logs.filter((log) => {
+        const logDate = new Date(log.date);
+        return logDate >= fromDate && logDate <= toDate;
+      });
     }
 
     if (req.query.limit) {
-      logs = logs.slice(0, req.query.limit).map((log) => {
-        return {
-          description: log.description,
-          duration: log.duration,
-          date: log.date.toDateString(),
-        };
-      });
+      logs = logs.slice(0, req.query.limit);
     }
 
     res.json({
       _id: user._id,
       username: user.username,
       count: logs.length,
-      log: logs,
+      log: logs.map((log) => {
+        return {
+          description: log.description,
+          duration: log.duration,
+          date: log.date.toDateString(),
+        };
+      }),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
